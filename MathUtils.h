@@ -3,10 +3,9 @@
 #include <cmath>
 #include <iostream>
 #include <utility>
-#include <numbers>
 #include <stdexcept>
 
-namespace vec2{
+namespace Math{
   using Real = double;
   constexpr Real eps = 1e-9;
 
@@ -85,13 +84,13 @@ namespace vec2{
       return floated;
     }
 
+    friend inline vec2 operator * (const Real& k, const vec2& u) {
+      return vec2(u.x * k, u.y * k);
+    }
+
     friend std::ostream& operator << (std::ostream& os, const vec2& u) {
       os << "(" << u.x << ", " << u.y << ")";
       return os;
     }
-  };
-
-  inline vec2 operator * (const Real k, const vec2 u) {
-    return vec2(u.x * k, u.y * k);
   };
 };
