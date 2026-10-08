@@ -5,6 +5,7 @@
 namespace sim{
   using Math::vec2;
   
+  inline const vec2 gravity = vec2(0.0, 98.1);
   struct Body;
 
   struct Particle{
@@ -33,6 +34,10 @@ namespace sim{
     vec2 rebound(); // gives rebound force against initial point
   };
 
+  struct Derivative{
+    vec2 v, a;
+  };
+
   struct Body{
   public:
     int N;
@@ -55,8 +60,74 @@ namespace sim{
       } return std::abs(signedArea) / 2.0;
     }
 
-    void update (int dt) {
-      return;
+    std::vector<Derivative> getDerivative () {
+      double A = Area();
+      
+      if (A < Math::eps) A = Math::eps;
+      double P = nRT / A;
+
+      std::vector<vec2> F(N);
+
+      for (int idx = 0; idx < N; idx++) {
+        int oth = (idx + 1) % N;
+
+        springs[idx].update();
+        vec2 Frebound = springs[idx].rebound();
+        F[idx] = F[idx] + Frebound;
+        F[oth] = F[oth] - Frebound;
+
+        vec2 edge = body[oth].pos - body[idx].pos;
+        vec2 Normal = vec2(edge.y, -edge.x);
+
+        vec2 Fp = Normal * P;
+        F[idx] = F[idx] + Fp * 0.5;
+        F[oth] = F[oth] + Fp * 0.5;
+
+        F[idx] = F[idx] + gravity * body[idx].mass;
+      }
+
+      std::vector<Derivative> dYdt(N);
+      for (int idx = 0; idx < N; idx++) {
+        dYdt[idx].a = F[idx] / body[idx].mass;
+        dYdt[idx].v = body[idx].vel;
+      }
+
+      return dYdt;
+    }
+
+    void update (double dt) { // RK4
+      std::vector<Particle> cur = body;
+      
+      std::vector<Derivative> k1 = getDerivative();
+      for (int idx = 0; idx < N; idx++) {
+        body[idx].pos = cur[idx].pos + k1[idx].v * dt * 0.5;
+        body[idx].vel = cur[idx].vel + k1[idx].a * dt * 0.5;
+      }
+
+      std::vector<Derivative> k2 = getDerivative();
+
+      for (int idx = 0; idx < N; idx++) {
+        body[idx].pos = cur[idx].pos + k2[idx].v * dt * 0.5;
+        body[idx].vel = cur[idx].vel + k2[idx].a * dt * 0.5;
+      }
+
+      std::vector<Derivative> k3 = getDerivative();
+
+      for (int idx = 0; idx < N; idx++) {
+        body[idx].pos = cur[idx].pos + k3[idx].v * dt;
+        body[idx].vel = cur[idx].vel + k3[idx].a * dt;
+      }
+
+      std::vector<Derivative> k4 = getDerivative();
+
+      body = cur;
+      for (int idx = 0; idx < N; idx++) {
+        vec2 avgAcc = (k1[idx].a + 2 * k2[idx].a + 2 * k3[idx].a + k4[idx].a) / 6.0;
+        vec2 avgVel = (k1[idx].v + 2 * k2[idx].v + 2 * k3[idx].v + k4[idx].v) / 6.0;
+
+        body[idx].pos = body[idx].pos + avgVel * dt;
+        body[idx].vel = body[idx].vel + avgAcc * dt;
+      }
     }
   };
 
@@ -70,5 +141,25 @@ namespace sim{
     vec2 spos = shape -> body[iidx].pos;
     vec2 epos = shape -> body[eidx].pos;
     l = (epos - spos).magnitude();
+  }
+
+  inline vec2 Spring::rebound() {
+    vec2 spos = shape -> body[iidx].pos;
+    vec2 epos = shape -> body[eidx].pos;
+
+    vec2 svel = shape -> body[iidx].vel;
+    vec2 evel = shape -> body[eidx].vel;
+
+    vec2 dirn = (epos - spos).normalize();
+    vec2 vrel = (evel - svel);
+    double x = l - l0;
+
+    double k = (x > 0) ? ke : kc;
+    double d = (x > 0) ? de : dc;
+  
+    double Fspring = k * x;
+    double Fdamp = d * dirn.dot(vrel);
+
+    return (Fspring + Fdamp) * dirn;
   }
 };
