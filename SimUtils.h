@@ -5,7 +5,10 @@
 namespace sim{
   using Math::vec2;
   
-  inline const vec2 gravity = vec2(0.0, 98.1);
+  double extraDampening = 0.999;
+  vec2 gravity = vec2(0.0, 0.0);
+  // inline const vec2 gravity = vec2(0.0, 98.1);
+
   struct Body;
 
   struct Particle{
@@ -23,8 +26,8 @@ namespace sim{
   public:
     Body* shape;
     int iidx, eidx;
-    double kc = 100.0, dc = 0.9; // for compression
-    double ke = 15.0, de = 0.2; // for expansion
+    double kc = 10000.0, dc = 0.99; // for compression
+    double ke = 1500.0, de = 0.9; // for expansion
     double l0, l;
 
     Spring() {}
@@ -41,7 +44,7 @@ namespace sim{
   struct Body{
   public:
     int N;
-    double nRT = 1000.0;
+    double nRT = 670000.0;
     std::vector<Particle> body;
     std::vector<Spring> springs;
 
@@ -127,6 +130,8 @@ namespace sim{
 
         body[idx].pos = body[idx].pos + avgVel * dt;
         body[idx].vel = body[idx].vel + avgAcc * dt;
+
+        body[idx].vel = body[idx].vel * extraDampening; // extra dampening
       }
     }
   };
